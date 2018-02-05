@@ -86,17 +86,9 @@ class NotesSet:
 		#else:
 			# Nothing to do
 	def get(self):
-		return self._notes.values()
-	#def __iter__(self):
-		#self._n = 0
-		#return self
-	#def __next__(self):
-		#if self._n < len(self._notes):
-			#idx = self._n
-			#self._n += 1
-			#return self._notes[idx]
-		#else:
-			#raise StopIteration
+		for (k,n) in sorted(self._notes.items(), key=lambda item: item[1].get_modified_date()):
+			#print(n)
+			yield n
 
 ##
 # MAIN
@@ -157,7 +149,7 @@ def main():
 			print('--------')
 			logging.debug(n)
 			print(n.get_title())
-			print("Creates at {}\t Modified at {}".format(n.get_created_date(), n.get_modified_date()))
+			print("Created at {}\t Modified at {}".format(n.get_created_date(), n.get_modified_date()))
 			print(n.get_note())
 
 if __name__ == "__main__":
