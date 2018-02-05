@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
 from Crypto.Cipher import AES
 from Crypto.Hash import MD5
+import logging
 import binascii
 import json
 import struct
@@ -64,23 +66,49 @@ class Note:
 		return datetime.fromtimestamp(self._json['minor_modified_date'] / 1000)
 	def get_modified_date(self):
 		return datetime.fromtimestamp(self._json['modified_date'] / 1000)
+	def is_archived(self):
+		return self._json['space'] == 16
 	def get_title(self):
 		return self._json['title']
 	def get_note(self):
 		return self._json['note']
 
+class NotesSet:
+	def __init__(self):
+		self._notes = {}
+	def has_uuid(self, uuid):
+		return uuid in self._notes.keys()
+	def update_if_newer(self, note):
+		if not self.has_uuid(note.get_uuid()):
+			self._notes[note.get_uuid()] = note
+		elif self._notes[note.get_uuid()].get_minor_modified_date() < note.get_minor_modified_date():
+			self._notes[note.get_uuid()] = note
+		#else:
+			# Nothing to do
+	def get(self):
+		return self._notes.values()
+	#def __iter__(self):
+		#self._n = 0
+		#return self
+	#def __next__(self):
+		#if self._n < len(self._notes):
+			#idx = self._n
+			#self._n += 1
+			#return self._notes[idx]
+		#else:
+			#raise StopIteration
 
 ##
 # MAIN
-# Just a test.
 def main():
 	_salt = b'ColorNote Fixed Salt'
 	_iterations = 20 # In fact, not required for derivation
 
-	#_password = b'0000'
+	logger = logging.getLogger()
+	#logger.setLevel(logging.DEBUG)
 
 	parser = OptionParser()
-	parser.add_option("-p", "--password", action="store", type="string", 
+	parser.add_option("-p", "--password", action="store", type="string",
 					dest="password", default="0000",
 					help="password for uncrypting backup notes")
 	parser.add_option("-q", "--quiet",
@@ -96,45 +124,41 @@ def main():
 
 	backup_directory = args[0]
 
-	notes = []
+	notes = NotesSet()
+
+	decoder = PBEWITHMD5AND128BITAES_CBC_OPENSSL(options.password.encode('utf-8'), _salt, _iterations)
 
 	for bakfile in glob.iglob(os.path.join(backup_directory, '**', '*.doc'), recursive=True):
-		print(bakfile)
-	
+		logging.debug(bakfile)
+
 		doc = open(bakfile, "rb").read()
 
-		decoder = PBEWITHMD5AND128BITAES_CBC_OPENSSL(options.password.encode('utf-8'), _salt, _iterations)
 		decoded_doc = decoder.decrypt(doc[28:])
 
-		#print(decoded_doc)
-
-		# Remove padding done with 0xF0
-		#decoded_doc = decoded_doc.rstrip(b'\x0f')
-		
 		open("/tmp/notes.bin", "wb").write(decoded_doc)
 
 		idx = 0x10
 		while idx + 4 < len(decoded_doc):
 			# File is padded with something like 0f0f0f0f or 0b0b0b0b...
-			if (decoded_doc[idx] == decoded_doc[idx+1] and decoded_doc[idx+1] == decoded_doc[idx+2] and decoded_doc[idx+2] == decoded_doc[idx+3]):
+			if (decoded_doc[idx] == decoded_doc[idx+1] and
+				decoded_doc[idx+1] == decoded_doc[idx+2] and
+				decoded_doc[idx+2] == decoded_doc[idx+3]):
 				break
 			(chunk_length,) = struct.unpack(">L", decoded_doc[idx:idx+4])
-			#print(chunk_length)
+			logging.debug("Chunk length: {}".format(chunk_length))
 			chunk = decoded_doc[idx+4:idx+chunk_length+4]
-			#print(chunk)
+			logging.debug("Chunk: {}".format(chunk))
 			json_chunk = json.loads(chunk.decode("utf-8"))
-			notes.append(Note(json_chunk))
+			notes.update_if_newer(Note(json_chunk))
 			idx += chunk_length + 4
 
-	for n in notes:
-		print('--------')
-		#print(n)
-		print(n.get_uuid())
-		print(n.get_created_date())
-		print(n.get_minor_modified_date())
-		print(n.get_modified_date())
-		print(n.get_title())
-		print(n.get_note())
+	for n in notes.get():
+		if not n.is_archived():
+			print('--------')
+			logging.debug(n)
+			print(n.get_title())
+			print("Creates at {}\t Modified at {}".format(n.get_created_date(), n.get_modified_date()))
+			print(n.get_note())
 
 if __name__ == "__main__":
 	main()
