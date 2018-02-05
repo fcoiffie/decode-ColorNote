@@ -12,6 +12,6 @@ The AES-128-CBC decrypt part is based on (Many thanks to olejorgenb) : https://g
 ```
 
 ## TODO
-[ ] Load Color tag  
-[ ] Export to HTML  
-[ ] Add new options for sorting/filtering notes
+- [ ] Load Color tag  
+- [ ] Export to HTML  
+- [ ] Add new options for sorting/filtering notes
