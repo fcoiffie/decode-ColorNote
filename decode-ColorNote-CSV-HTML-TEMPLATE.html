@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="An HTML5 Template for creating a ColorNote Table.">
+        <meta name="author" content="Michael Biggs">
+        <title>ColorNote Table</title>
+        <!--<link rel="stylesheet" href="colornote_table.css">-->
+        <style>
+            body {
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 14px;
+                font-weight: normal;
+            }
+            h1 {
+                font-size: 18px;
+                font-weight: bold;
+            }
+            p {
+                font-size: 10px;
+            }
+            #colornote_table {
+                font-size: 14px;
+                font-weight: normal;
+                border-collapse: collapse;
+                white-space: pre;
+                /*width: 100%;*/
+            }
+            #colornote_table tr, th, td {
+                border: 2px solid #ddd;
+                padding: 8px;
+            }
+            #colornote_table th {
+                font-weight: normal;
+                text-align: left;
+                background-color: #3a3;
+                color: white;
+            }
+            #colornote_table th:hover {
+                background-color: #171;
+            }
+            #colornote_table tfoot td {
+                font-size: 10px;
+                text-align: center;
+            }
+            .red {
+                background-color: red;
+            }
+            .green {
+                background-color: green;
+            }
+            .blue {
+                background-color: blue;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <!--<h1>TITLE_PLACEHOLDER</h1>-->
+            <!--<p>created: DATETIME_PLACEHOLDER</p>-->
+        </header>
+COLORNOTE_TABLE_PLACEHOLDER
+        <script>
+            // -----------------------------------------------------------------
+            var ColorNote_color_map = {
+                1: "RGB(255,230,233)", // red
+                2: "RGB(255,235,216)", // orange
+                3: "RGB(254,248,186)", // yellow
+                4: "RGB(229,248,220)", // green
+                5: "RGB(232,233,254)", // blue
+                6: "RGB(239,224,255)", // purple
+                7: "RGB(204,204,204)", // black
+                8: "RGB(238,238,238)", // grey
+                9: "RGB(255,255,255)", // white
+            };
+            // -----------------------------------------------------------------
+            var color_index_column = parseInt(COLOR_INDEX_COLUMN_PLACEHOLDER);
+            // -----------------------------------------------------------------
+            // Color row based on cell value
+            // https://stackoverflow.com/questions/15510708/color-row-based-on-cell-value
+            // 2022-11-20
+            // modified by Michael Biggs
+            var rows = document.getElementById("colornote_table").getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+            // loops through each row
+            for (var i = 0; i < rows.length; i++) {
+                var cells = rows[i].getElementsByTagName("td");
+                color_index = Number(cells[color_index_column].innerHTML.trim());
+                rows[i].style.backgroundColor = ColorNote_color_map[color_index];
+            };
+            /*
+            for (var i = 0; i < rows.length; i++) {
+                var cells = rows[i].getElementsByTagName("td");
+                if (cells[0].innerHTML.trim() == 1)
+                    rows[i].className = "red";
+                if (cells[0].innerHTML.trim() == 2)
+                    rows[i].className = "green";
+                if (cells[0].innerHTML.trim() == 3)
+                    rows[i].className = "blue";
+            };
+            */
+            // -----------------------------------------------------------------
+            // Sort a table by clicking its headers
+            // https://htmldom.dev/sort-a-table-by-clicking-its-headers/
+            // 2022-11-20
+            // modified by Michael Biggs
+            // Query the table
+            const table = document.getElementById("colornote_table");
+            // Query the headers
+            const headers = table.querySelectorAll("th");
+            // Loop over the headers
+            [].forEach.call(headers, function (header, index) {
+                header.title = "click to sort"; // add tooltip
+                header.addEventListener("click", function () {
+                    // This function will sort the column
+                    sortColumn(index);
+                });
+            });
+            // -----------------------------------------------------------------
+            // How TO - Sort a Table
+            // https://www.w3schools.com/howto/howto_js_sort_table.asp
+            // 2022-11-20
+            // modified by Michael Biggs
+            function sortColumn(n) {
+                var i, x, y;
+                var table, rows;
+                var dir, switching, shouldswitch, switchcount = 0;
+                table = document.getElementById("colornote_table");
+                switching = true;
+                //Set the sorting direction to ascending:
+                dir = "asc";
+                /*Make a loop that will continue until
+                no switching has been done:*/
+                while (switching) {
+                    //start by saying: no switching is done:
+                    switching = false;
+                    rows = table.rows;
+                    /*Loop through all table rows (except the
+                    first, which contains table headers):*/
+                    // avoid first (header) row by using      i = 1
+                    //                             instead of i = 0
+                    // avoid last  (footer) row by using      rows.length - 2
+                    //                             instead of rows.length - 1
+                    for (i = 1; i < (rows.length - 2); i++) {
+                        //start by saying there should be no switching:
+                        shouldswitch = false;
+                        /*Get the two elements you want to compare,
+                        one from current row and one from the next:*/
+                        x = rows[i].getElementsByTagName("TD")[n];
+                        y = rows[i + 1].getElementsByTagName("TD")[n];
+                        /*check if the two rows should switch place,
+                        based on the direction, asc or desc:*/
+                        let xhtml = x.innerHTML.toLowerCase();
+                        let yhtml = y.innerHTML.toLowerCase();
+                        if (dir == "asc") {
+                            //if (xhtml > yhtml) {
+                            if (xhtml.localeCompare(yhtml, "en", {numeric: true}) == 1) {
+                                //if so, mark as a switch and break the loop:
+                                shouldswitch= true;
+                                break;
+                            }
+                        } else if (dir == "desc") {
+                            //if (xhtml < yhtml) {
+                            if (yhtml.localeCompare(xhtml, "en", {numeric: true}) == 1) {
+                                //if so, mark as a switch and break the loop:
+                                shouldswitch = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (shouldswitch) {
+                        /*If a switch has been marked, make the switch
+                        and mark that a switch has been done:*/
+                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                        switching = true;
+                        //Each time a switch is done, increase this count by 1:
+                        switchcount ++;
+                    } else {
+                        /*If no switching has been done AND the direction is "asc",
+                        set the direction to "desc" and run the while loop again.*/
+                        if (switchcount == 0 && dir == "asc") {
+                            dir = "desc";
+                            switching = true;
+                        }
+                    }
+                }
+            }
+            // -----------------------------------------------------------------
+        </script>
+        <!--<script src="colornote_table.js"></script>-->
+        <footer>
+            <!--
+            <p>opened:
+                <script>
+                    document.write(new Date().toISOString());
+                    //document.write(new Date().toLocaleDateString());
+                    //let date = new Date();
+                    //let YYYY = date.getFullYear();
+                    //let MM = ("0" + (date.getMonth() + 1).toString()).slice(-2);
+                    //let DD = ("0" + date.getDate()).slice(-2);
+                    //document.write(YYYY + "-" + MM +"-" + DD);
+                </script>
+            </p>
+            -->
+        </footer>
+    </body>
+</html>
