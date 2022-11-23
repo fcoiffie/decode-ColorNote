@@ -14,7 +14,7 @@ from os.path import abspath, dirname
 import csv
 import traceback
 from datetime import timezone
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------END
 
 # ---------------------------------------------------------------------------NEW
 def get_excel_date(dt):
@@ -25,7 +25,7 @@ def get_excel_date(dt):
     dt_python = dt.replace(tzinfo=UTC)
     dt_excel_zero = datetime(1899, 12, 30, tzinfo=UTC)
     return (dt_python - dt_excel_zero).total_seconds() / 86400
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------END
 
 # ---------------------------------------------------------------------------NEW
 def get_html_table(id, caption, list_head, list_data, datetime, indent):
@@ -45,12 +45,11 @@ def get_html_table(id, caption, list_head, list_data, datetime, indent):
     list.append(tab * 1 + '<tbody>')
     for lrow in list_data:
         list.append(tab * 2 + '<tr>')
-        # ----------------------------------------------------------------------
         list_row = []
         for index, item in enumerate(lrow):
             if (index != index_note) and (index != index_title):
                 try:
-                    tmp = int(item)
+                    number_test = int(item)
                     list_row.append('<td style="text-align: right;">' + str(item) + '</td>')
                 except:
                     list_row.append('<td>' + str(item) + '</td>')
@@ -58,7 +57,6 @@ def get_html_table(id, caption, list_head, list_data, datetime, indent):
                 list_row.append('<td>' + str(item) + '</td>')
         row = "".join(list_row)
         list.append(tab * 3 + row)
-        # ----------------------------------------------------------------------
         list.append(tab * 2 + '</tr>')
     list.append(tab * 1 + '</tbody>')
     list.append(tab * 1 + '<tfoot>')
@@ -68,7 +66,7 @@ def get_html_table(id, caption, list_head, list_data, datetime, indent):
     list.append(tab * 1 + '</tfoot>')
     list.append('</table>')
     return list
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------END
 
 class PBEWITHMD5AND128BITAES_CBC_OPENSSL:
     def __init__(self, password, salt, iterations):
@@ -154,26 +152,43 @@ class NotesSet:
 # MAIN
 def main():
     # -----------------------------------------------------------------------NEW
-    # for default_backup_path and default_tmp_path, either assign null string ""
-    # to use user 'Documents' folder or specify full path, for example:
-    #     backup    null string   ->  r"C:\<user path>\Documents\backup"
-    #     backup    full path     ->  r"C:\<some path>\backup"
-    #     tmp       null string   ->  r"C:\<user path>\Documents\tmp"
-    #     tmp       full path     ->  r"C:\<some path>\tmp"
-    default_backup_path = ""
-    default_tmp_path = ""
+    """
+    If the ColorNote backup directory is not given on the command line, the
+    script will search in directory 'backup_dirname' using paths as follows:
+        1. specified_backup_path
+        2. user document path     (if specified_backup_path = "")
+    Similarly, tmp and output directories 'tmp_dirname' and 'output_dirname'
+    will be created using paths as follows:
+        1. specified_tmp_path
+        2. user document path     (if specified_tmp_path = "")
+    and:
+        1. specified_output_path
+        2. user document path     (if specified_output_path = "")
+    For example:
+        backup  specified  ->  r"C:\<specified_backup_path>"
+        backup  user       ->  r"C:\<user path>\Documents\<backup_dirname>"
+        output  specified  ->  r"C:\<specified_output_path>"
+        output  user       ->  r"C:\<user path>\Documents\<output_dirname>"
+        tmp     specified  ->  r"C:\<specified_tmp_path>"
+        tmp     user       ->  r"C:\<user path>\Documents\<tmp_dirname>"
+    """
+    specified_backup_path = ""
+    specified_tmp_path = "ColorNote_tmp"
+    specified_output_path = "ColorNote_output"
+    backup_dirname = "backup"
+    tmp_dirname = "ColorNote_tmp"
+    output_dirname = "ColorNote_output"
     html_template = r"decode-ColorNote-CSV-HTML-TEMPLATE.html"
     out_name_csv = "ColorNote_backup"
     out_extn_csv = ".csv"
     out_sep_csv = "_"
     out_name_html = "ColorNote_backup"
-    out_name_html_tab = "ColorNote_backup_tabulate"
     out_extn_html = ".html"
     out_sep_html = "_"
-    json_keys_select = ["_id", "color_index", "created_date",
-                        "minor_modified_date", "modified_date", "note",
-                        "revision", "title"]
-    # json_keys_select must include key: "color_index" - for html table creation
+    # 'json_keys_select' must include key: "color_index" - for html output
+    json_keys_select = ["_id", "color_index",
+                        "created_date", "minor_modified_date", "modified_date",
+                        "note", "revision", "title"]
     # json keys available:
     #     "_id", "account_id", "active_state", "color_index",
     #     "created_date", "dirty", "encrypted", "folder_id",
@@ -183,7 +198,7 @@ def main():
     #     "reminder_last", "reminder_option", "reminder_repeat",
     #     "reminder_repeat_ends", "reminder_type", "revision", "space",
     #     "staged", "status", "tags", "title", "type", "uuid"
-    # --------------------------------------------------------------------------
+    # -----------------------------------------------------------------------END
 
     _salt = b'ColorNote Fixed Salt'
     _iterations = 20 # In fact, not required for derivation
@@ -201,57 +216,93 @@ def main():
 
     (options, args) = parser.parse_args()
 
-    if len(args) != 1:
-        parser.error("ColorNote backup directory is missing")
-    if not os.path.isdir(args[0]):
-        parser.error("Argument '{}' is not a directory or doesn't exist".format(args[0]))
+    #if len(args) != 1:
+    #    parser.error("ColorNote backup directory is missing")
+    #if not os.path.isdir(args[0]):
+    #    parser.error("Argument '{}' is not a directory or doesn't exist".format(args[0]))
 
-    backup_directory = args[0]
+    # -----------------------------------------------------------------------NEW
+    # assign generic paths
+    script_path = dirname(abspath(__file__))
+    user_home_path = os.path.expanduser("~")
+    user_docs_path = os.path.join(user_home_path, "Documents")
+    # -----------------------------------------------------------------------END
+
+    # -----------------------------------------------------------------------NEW
+    # check backup path
+    user_backup_path = os.path.join(user_docs_path, backup_dirname)
+    user_backup_path = user_backup_path if os.path.isdir(user_backup_path) else ""
+    if len(args) != 1:
+        backup_directory = specified_backup_path if os.path.isdir(specified_backup_path) else user_backup_path
+    else:
+        backup_directory = args[0]
+    if not os.path.isdir(backup_directory):
+        parser.error("Argument '{}' is not a directory or doesn't exist".format(backup_directory))
+    # -----------------------------------------------------------------------END
+
+    #backup_directory = args[0] # ORIGINAL
 
     notes = NotesSet()
 
     decoder = PBEWITHMD5AND128BITAES_CBC_OPENSSL(options.password.encode('utf-8'), _salt, _iterations)
 
-    for bakfile in glob.iglob(os.path.join(backup_directory, '**', '*.doc'), recursive=True):
+    # ----------------------------------------------------------MODIFIED AND NEW
+    # renamed 'decoded_doc' as 'decoded_backup_file'
+    backup_files = []
+    for type in ("*.dat", "*.doc"):
+        backup_files.extend(glob.iglob(os.path.join(backup_directory, "**", type), recursive=True))
+    logging.debug(backup_files)
+    for bakfile in backup_files:
+    #for bakfile in glob.iglob(os.path.join(backup_directory, '**', '*.dat'), recursive=True): # ORIGINAL
         logging.debug(bakfile)
 
-        doc = open(bakfile, "rb").read()
+        backup_file = open(bakfile, "rb").read()
 
-        decoded_doc = decoder.decrypt(doc[28:])
+        # handle file types
+        match os.path.splitext(bakfile)[1].lower():
+            case ".dat":
+                magic_offset = 0
+            case ".doc":
+                magic_offset = 28
+            case _:
+                print("Backup file type not recognised.  Require '.dat' or '.doc'.")
+                Exit
+
+        decoded_backup_file = decoder.decrypt(backup_file[magic_offset:])
 
         #open("/tmp/notes.bin", "wb").write(decoded_doc) # ORIGINAL
 
-        # -------------------------------------------------------------------NEW
-        # create output path
-        directory = dirname(abspath(__file__))
-        tmp_path = os.path.join(directory, "tmp")
-        os.makedirs(tmp_path, exist_ok=True)
-        open(os.path.join(tmp_path, "notes.bin"), "wb").write(bytes(str(decoded_doc),"utf-8"))
-        # ----------------------------------------------------------------------
+        # create tmp path
+        user_tmp_path = os.path.join(user_docs_path, tmp_dirname)
+        tmp_directory = specified_tmp_path if specified_tmp_path else user_tmp_path
+        os.makedirs(tmp_directory, exist_ok=True)
 
-        # -------------------------------------------------------------------NEW
+        # write to tmp file
+        open(os.path.join(tmp_directory, "notes.bin"), "wb").write(bytes(str(decoded_backup_file), "utf-8"))
+        #open(os.path.join(tmp_directory, "notes.bin"), "wb").write(decoded_backup_file)
+
         # locate substring to give start offset = idx + 4
         substring = b'{"_id":1,"title"'
-        offset = decoded_doc.find(substring)
-        extract = decoded_doc[offset:offset+len(substring)].decode("utf-8")
+        offset = decoded_backup_file.find(substring)
+        extract = decoded_backup_file[offset:offset+len(substring)].decode("utf-8")
         logging.debug(f"{offset: <10}: {extract}")
         idx = offset - 4
-        # ----------------------------------------------------------------------
 
         #idx = 0x10 # ORIGINAL
-        while idx + 4 < len(decoded_doc):
+        while idx + 4 < len(decoded_backup_file):
             # File is padded with something like 0f0f0f0f or 0b0b0b0b...
-            if (decoded_doc[idx] == decoded_doc[idx+1] and
-                decoded_doc[idx+1] == decoded_doc[idx+2] and
-                decoded_doc[idx+2] == decoded_doc[idx+3]):
+            if (decoded_backup_file[idx] == decoded_backup_file[idx+1] and
+                decoded_backup_file[idx+1] == decoded_backup_file[idx+2] and
+                decoded_backup_file[idx+2] == decoded_backup_file[idx+3]):
                 break
-            (chunk_length,) = struct.unpack(">L", decoded_doc[idx:idx+4])
+            (chunk_length,) = struct.unpack(">L", decoded_backup_file[idx:idx+4])
             logging.debug("Chunk length: {}".format(chunk_length))
-            chunk = decoded_doc[idx+4:idx+chunk_length+4]
+            chunk = decoded_backup_file[idx+4:idx+chunk_length+4]
             logging.debug("Chunk: {}".format(chunk))
             json_chunk = json.loads(chunk.decode("utf-8"))
             notes.update_if_newer(Note(json_chunk))
             idx += chunk_length + 4
+    # -----------------------------------------------------------------------END
 
     #for n in notes.get():
     #    if not n.is_archived():
@@ -266,12 +317,19 @@ def main():
     dtiso = dt.isoformat()
     dtymdhms = dt.strftime("%Y%m%d_%H%M%S")
     dtymd = dt.strftime("%Y%m%d")
-    # --------------------------------------------------------------------------
+    # -----------------------------------------------------------------------END
 
     # -----------------------------------------------------------------------NEW
-    file_path = out_name_csv + out_sep_csv + dtymdhms + out_extn_csv
-    #with open(file_path, "a", newline="", encoding="iso-8859-1") as out_file:
-    with open(file_path, "a", newline="", encoding="utf-8") as out_file:
+    # create output path
+    user_output_path = os.path.join(user_docs_path, output_dirname)
+    output_directory = specified_output_path if specified_output_path else user_output_path
+    os.makedirs(output_directory, exist_ok=True)
+
+    # write to csv file
+    file_name = out_name_csv + out_sep_csv + dtymdhms + out_extn_csv
+    output_file = os.path.join(output_directory, file_name)
+    #with open(output_file, "a", newline="", encoding="iso-8859-1") as out_file:
+    with open(output_file, "a", newline="", encoding="utf-8") as out_file:
         csvwriter = csv.writer(out_file, delimiter=",")
 
         list_html = []
@@ -324,7 +382,7 @@ def main():
                 logging.debug(njson.keys())
                 logging.debug(njson.values())
                 logging.debug(njson["note"])
-    # --------------------------------------------------------------------------
+    # -----------------------------------------------------------------------END
 
     # -----------------------------------------------------------------------NEW
     list_table = get_html_table("colornote_table", "ColorNote Table",
@@ -333,17 +391,31 @@ def main():
     replace_table_text = "\n".join(list_table)
     search_index_placeholder = "COLOR_INDEX_COLUMN_PLACEHOLDER"
     replace_index_text = str(json_keys.index("color_index"))
-    # read from source file
+    # read from html template file
     with open(html_template, "r") as in_file:
         data = in_file.read()
         data = data.replace(search_table_placeholder, replace_table_text)
         data = data.replace(search_index_placeholder, replace_index_text)
-    # write to target file
-    file_path = out_name_html + out_sep_html + dtymdhms + out_extn_html
-    #with open(file_path, "w", newline="", encoding="iso-8859-1") as out_file:
-    with open(file_path, "w", newline="", encoding="utf-8") as out_file:
+    # write to html file
+    file_name = out_name_html + out_sep_html + dtymdhms + out_extn_html
+    output_file = os.path.join(output_directory, file_name)
+    #with open(output_file, "w", newline="", encoding="iso-8859-1") as out_file:
+    with open(output_file, "w", newline="", encoding="utf-8") as out_file:
         out_file.write(data)
-    # --------------------------------------------------------------------------
+    # -----------------------------------------------------------------------END
 
 if __name__ == "__main__":
-    main()
+    #main() # ORIGINAL
+    # -----------------------------------------------------------------------NEW
+    #input()
+    try:
+        main()
+        print("\nFinished.")
+    except:
+        print(sys.exc_info()[0])
+        print(traceback.format_exc())
+        print("\nProgram terminated.")
+    finally:
+        print("\nPlease press Enter to exit...", end="")
+        input()
+    # -----------------------------------------------------------------------END
