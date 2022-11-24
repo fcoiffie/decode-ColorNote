@@ -26,8 +26,7 @@ def get_excel_date(dt):
 # ------------------------------------------------------------------------------
 
 class PBEWITHMD5AND128BITAES_CBC_OPENSSL:
-    def __init__(self, password, salt, iterations):
-        # Iterations aren't used
+    def __init__(self, password, salt):
         (self._key, self._iv) = self._get_derived_key_and_iv(password, salt)
 
     def _get_derived_key_and_iv(self, password, salt):
@@ -69,8 +68,8 @@ class PBEWITHMD5AND128BITAES_CBC_OPENSSL:
         return encoder.decrypt(data)
 
 class Note:
-    def __init__(self, json):
-        self._json = json
+    def __init__(self, json_string):
+        self._json = json_string
     def __repr__(self):
         return json.dumps(self._json, sort_keys=True, indent=4)
     def get_uuid(self):
@@ -101,7 +100,7 @@ class NotesSet:
         #else:
             # Nothing to do
     def get(self):
-        for (k,n) in sorted(self._notes.items(), key=lambda item: item[1].get_modified_date()):
+        for n in sorted(self._notes.values(), key=lambda item: item.get_modified_date()):
             #print(n)
             yield n
 
@@ -112,21 +111,20 @@ def main():
     out_name = "ColorNote_backup"
     out_extn = ".csv"
     out_sep = "_"
-    json_keys = ["_id", "account_id", "active_state", "color_index",
-                 "created_date", "dirty", "encrypted", "folder_id",
-                 "importance", "latitude", "longitude", "minor_modified_date",
-                 "modified_date", "note", "note_ext", "note_type",
-                 "reminder_base", "reminder_date", "reminder_duration",
-                 "reminder_last", "reminder_option", "reminder_repeat",
-                 "reminder_repeat_ends", "reminder_type", "revision", "space",
-                 "staged", "status", "tags", "title", "type", "uuid"]
+    # json_keys = ["_id", "account_id", "active_state", "color_index",
+    #              "created_date", "dirty", "encrypted", "folder_id",
+    #              "importance", "latitude", "longitude", "minor_modified_date",
+    #              "modified_date", "note", "note_ext", "note_type",
+    #              "reminder_base", "reminder_date", "reminder_duration",
+    #              "reminder_last", "reminder_option", "reminder_repeat",
+    #              "reminder_repeat_ends", "reminder_type", "revision", "space",
+    #              "staged", "status", "tags", "title", "type", "uuid"]
     json_keys_select = ["_id", "color_index", "created_date",
                         "minor_modified_date", "modified_date", "note",
                         "revision", "title"]
     # --------------------------------------------------------------------------
 
     _salt = b'ColorNote Fixed Salt'
-    _iterations = 20 # In fact, not required for derivation
 
     parser = ArgumentParser()
     parser.add_argument("-p", "--password", action="store", type=str,
@@ -155,10 +153,10 @@ def main():
 
     notes = NotesSet()
 
-    decoder = PBEWITHMD5AND128BITAES_CBC_OPENSSL(options.password.encode('utf-8'), _salt, _iterations)
+    decoder = PBEWITHMD5AND128BITAES_CBC_OPENSSL(options.password.encode('utf-8'), _salt)
 
     for bakfile in glob.iglob(os.path.join(options.colornote_backup_dir, '**', '*.doc'), recursive=True):
-        logging.debug(f"Parsing {bakfile}...")
+        logging.debug("Parsing %s...", bakfile)
 
         doc = open(bakfile, "rb").read()
 
@@ -175,7 +173,7 @@ def main():
         substring = b'{"_id":1,"title"'
         offset = decoded_doc.find(substring)
         extract = decoded_doc[offset:offset+len(substring)].decode("utf-8")
-        logging.debug(f'{offset: <10}: {extract}')
+        logging.debug("%10d: %s", offset, extract)
         idx = offset - 4
 
         while idx + 4 < len(decoded_doc):
@@ -185,9 +183,9 @@ def main():
                 decoded_doc[idx+2] == decoded_doc[idx+3]):
                 break
             (chunk_length,) = struct.unpack(">L", decoded_doc[idx:idx+4])
-            logging.debug("Chunk length: {}".format(chunk_length))
+            logging.debug("Chunk length: %d", chunk_length)
             chunk = decoded_doc[idx+4:idx+chunk_length+4]
-            logging.debug("Chunk: {}".format(chunk))
+            logging.debug("Chunk: %s", chunk.decode())
             json_chunk = json.loads(chunk.decode("utf-8"))
             notes.update_if_newer(Note(json_chunk))
             idx += chunk_length + 4
