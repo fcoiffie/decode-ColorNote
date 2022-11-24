@@ -2,7 +2,6 @@
 from Crypto.Cipher import AES
 from Crypto.Hash import MD5
 import logging
-import binascii
 import json
 import struct
 import os
@@ -10,6 +9,22 @@ import glob
 from datetime import datetime
 from optparse import OptionParser
 from os.path import abspath, dirname
+# ---------------------------------------------------------------------------NEW
+import csv
+import traceback
+from datetime import timezone
+# ------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------NEW
+def get_excel_date(dt):
+    # Microsoft Excel date is number of days since 1899-12-30
+    # Microsoft Excel date = 1 = 1900-01-01
+    # seconds per day = 60*60*24 = 86400
+    UTC = timezone.utc
+    dt_python = dt.replace(tzinfo=UTC)
+    dt_excel_zero = datetime(1899, 12, 30, tzinfo=UTC)
+    return (dt_python - dt_excel_zero).total_seconds() / 86400
+# ------------------------------------------------------------------------------
 
 class PBEWITHMD5AND128BITAES_CBC_OPENSSL:
     def __init__(self, password, salt, iterations):
@@ -94,19 +109,39 @@ class NotesSet:
 ##
 # MAIN
 def main():
+    # -----------------------------------------------------------------------NEW
+    out_name = "ColorNote_backup"
+    out_extn = ".csv"
+    out_sep = "_"
+    json_keys = ["_id", "account_id", "active_state", "color_index",
+                 "created_date", "dirty", "encrypted", "folder_id",
+                 "importance", "latitude", "longitude", "minor_modified_date",
+                 "modified_date", "note", "note_ext", "note_type",
+                 "reminder_base", "reminder_date", "reminder_duration",
+                 "reminder_last", "reminder_option", "reminder_repeat",
+                 "reminder_repeat_ends", "reminder_type", "revision", "space",
+                 "staged", "status", "tags", "title", "type", "uuid"]
+    json_keys_select = ["_id", "color_index", "created_date",
+                        "minor_modified_date", "modified_date", "note",
+                        "revision", "title"]
+    # --------------------------------------------------------------------------
+
     _salt = b'ColorNote Fixed Salt'
     _iterations = 20 # In fact, not required for derivation
-
-    logger = logging.getLogger()
-    #logger.setLevel(logging.DEBUG)
 
     parser = OptionParser()
     parser.add_option("-p", "--password", action="store", type="string",
                     dest="password", default="0000",
                     help="password for uncrypting backup notes")
-    parser.add_option("-q", "--quiet",
-                    action="store_false", dest="verbose", default=True,
-                    help="don't print status messages to stdout")
+    parser.add_option("--csv",
+                    action="store_true", default=False,
+                    help="output as a CSV file")
+    parser.add_option("-v", "--verbose",
+                    action="store_true", dest="verbose", default=False,
+                    help="[For debug] verbose output")
+    parser.add_option("--binary",
+                    action="store_true", default=False,
+                    help="[For debug] dump the decrypted binary in tmp/notes.bin")
 
     (options, args) = parser.parse_args()
 
@@ -115,6 +150,9 @@ def main():
     if not os.path.isdir(args[0]):
         parser.error("Argument '{}' is not a directory or doesn't exist".format(args[0]))
 
+
+    logging.basicConfig(level=logging.DEBUG if options.verbose else logging.WARNING)
+
     backup_directory = args[0]
 
     notes = NotesSet()
@@ -122,32 +160,26 @@ def main():
     decoder = PBEWITHMD5AND128BITAES_CBC_OPENSSL(options.password.encode('utf-8'), _salt, _iterations)
 
     for bakfile in glob.iglob(os.path.join(backup_directory, '**', '*.doc'), recursive=True):
-        logging.debug(bakfile)
+        logging.debug(f"Parsing {bakfile}...")
 
         doc = open(bakfile, "rb").read()
 
         decoded_doc = decoder.decrypt(doc[28:])
 
-        #open("/tmp/notes.bin", "wb").write(decoded_doc) # ORIGINAL
+        # For debug purpose: create output path and dump the decrypted binary
+        if options.binary:
+            directory = dirname(abspath(__file__))
+            tmp_path = os.path.join(directory, "tmp")
+            os.makedirs(tmp_path, exist_ok=True)
+            open(os.path.join(tmp_path, "notes.bin"), "wb").write(bytes(str(decoded_doc),"utf-8"))
 
-        # -------------------------------------------------------------------NEW
-        # create output path
-        directory = dirname(abspath(__file__))
-        tmp_path = os.path.join(directory, "tmp")
-        os.makedirs(tmp_path, exist_ok=True)
-        open(os.path.join(tmp_path, "notes.bin"), "wb").write(bytes(str(decoded_doc),"utf-8"))
-        # ----------------------------------------------------------------------
-
-        # -------------------------------------------------------------------NEW
         # locate substring to give start offset = idx + 4
         substring = b'{"_id":1,"title"'
         offset = decoded_doc.find(substring)
         extract = decoded_doc[offset:offset+len(substring)].decode("utf-8")
         logging.debug(f'{offset: <10}: {extract}')
         idx = offset - 4
-        # ----------------------------------------------------------------------
 
-        #idx = 0x10 # ORIGINAL
         while idx + 4 < len(decoded_doc):
             # File is padded with something like 0f0f0f0f or 0b0b0b0b...
             if (decoded_doc[idx] == decoded_doc[idx+1] and
@@ -162,13 +194,52 @@ def main():
             notes.update_if_newer(Note(json_chunk))
             idx += chunk_length + 4
 
+
+    if options.csv:
+        dtn = datetime.now()
+        dtymdhms = dtn.strftime("%Y%m%d_%H%M%S")
+        file_path = out_name + out_sep + dtymdhms + out_extn
+        out_file = open(file_path, 'a', newline='', encoding='utf-8')
+        csvwriter = csv.writer(out_file, delimiter=',')
+
+        # write headers
+        csvwriter.writerow(json_keys_select)
+
     for n in notes.get():
         if not n.is_archived():
-            print('--------')
+            print("-"*50)
             logging.debug(n)
             print(n.get_title())
             print("Created at {}\t Modified at {}".format(n.get_created_date(), n.get_modified_date()))
             print(n.get_note())
+            if options.csv:
+                njson = json.loads(str(n))
+                row = []
+                for key in json_keys_select:
+                    match key:
+                        case "created_date":
+                            #value = n.get_created_date().isoformat()
+                            #value = n.get_created_date().strftime("%Y-%m-%d %H:%M:%S.%f")
+                            value = get_excel_date(n.get_created_date())
+                        case "minor_modified_date":
+                            #value = n.get_minor_modified_date().isoformat()
+                            #value = n.get_minor_modified_date().strftime("%Y-%m-%d %H:%M:%S.%f")
+                            value = get_excel_date(n.get_minor_modified_date())
+                        case "modified_date":
+                            #value = n.get_modified_date().isoformat()
+                            #value = n.get_modified_date().strftime("%Y-%m-%d %H:%M:%S.%f")
+                            value = get_excel_date(n.get_modified_date())
+                        case _:
+                            value = njson[key]
+                    row.append(value)
+                csvwriter.writerow(row)
+                logging.debug(njson)
+                logging.debug(njson.keys())
+                logging.debug(njson.values())
+                logging.debug(njson["note"])
+
+    if options.csv:
+        out_file.close()
 
 if __name__ == "__main__":
     main()
