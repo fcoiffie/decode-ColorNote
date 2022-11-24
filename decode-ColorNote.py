@@ -7,11 +7,10 @@ import struct
 import os
 import glob
 from datetime import datetime
-from optparse import OptionParser
+from argparse import ArgumentParser
 from os.path import abspath, dirname
 # ---------------------------------------------------------------------------NEW
 import csv
-import traceback
 from datetime import timezone
 # ------------------------------------------------------------------------------
 
@@ -129,37 +128,36 @@ def main():
     _salt = b'ColorNote Fixed Salt'
     _iterations = 20 # In fact, not required for derivation
 
-    parser = OptionParser()
-    parser.add_option("-p", "--password", action="store", type="string",
+    parser = ArgumentParser()
+    parser.add_argument("-p", "--password", action="store", type=str,
                     dest="password", default="0000",
                     help="password for uncrypting backup notes")
-    parser.add_option("--csv",
+    parser.add_argument("--csv",
                     action="store_true", default=False,
                     help="output as a CSV file")
-    parser.add_option("-v", "--verbose",
+    parser.add_argument("-v", "--verbose",
                     action="store_true", dest="verbose", default=False,
                     help="[For debug] verbose output")
-    parser.add_option("--binary",
+    parser.add_argument("--binary",
                     action="store_true", default=False,
                     help="[For debug] dump the decrypted binary in tmp/notes.bin")
+    parser.add_argument('colornote_backup_dir', type=str,
+                        help='ColorNote backup directory (with .doc files)')
 
-    (options, args) = parser.parse_args()
 
-    if len(args) != 1:
-        parser.error("ColorNote backup directory is missing")
-    if not os.path.isdir(args[0]):
-        parser.error("Argument '{}' is not a directory or doesn't exist".format(args[0]))
+    options = parser.parse_args()
+
+    if not os.path.isdir(options.colornote_backup_dir):
+        parser.error("Argument '{}' is not a directory or doesn't exist".format(options.colornote_backup_dir))
 
 
     logging.basicConfig(level=logging.DEBUG if options.verbose else logging.WARNING)
-
-    backup_directory = args[0]
 
     notes = NotesSet()
 
     decoder = PBEWITHMD5AND128BITAES_CBC_OPENSSL(options.password.encode('utf-8'), _salt, _iterations)
 
-    for bakfile in glob.iglob(os.path.join(backup_directory, '**', '*.doc'), recursive=True):
+    for bakfile in glob.iglob(os.path.join(options.colornote_backup_dir, '**', '*.doc'), recursive=True):
         logging.debug(f"Parsing {bakfile}...")
 
         doc = open(bakfile, "rb").read()
