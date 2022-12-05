@@ -9,11 +9,12 @@ import os
 import glob
 from datetime import datetime
 from optparse import OptionParser
-from os.path import abspath, dirname
 # ---------------------------------------------------------------------------NEW
 import csv
+import sys
 import traceback
 from datetime import timezone
+from os.path import abspath, dirname
 # ---------------------------------------------------------------------------END
 
 # ---------------------------------------------------------------------------NEW
@@ -249,7 +250,7 @@ def main():
     # ----------------------------------------------------------MODIFIED AND NEW
     # renamed 'decoded_doc' as 'decoded_backup_file'
     backup_files = []
-    for type in ("*.dat", "*.doc"):
+    for type in ("*.backup", "*.dat", "*.doc"):
         backup_files.extend(glob.iglob(os.path.join(backup_directory, "**", type), recursive=True))
     logging.debug(backup_files)
     for bakfile in backup_files:
@@ -260,12 +261,14 @@ def main():
 
         # handle file types
         match os.path.splitext(bakfile)[1].lower():
+            case ".backup": 
+                magic_offset = 28 # 12 also appears to work
             case ".dat":
                 magic_offset = 0
             case ".doc":
                 magic_offset = 28
             case _:
-                print("Backup file type not recognised.  Require '.dat' or '.doc'.")
+                print("Backup file type not recognised.  Require '.backup' , '.dat' or '.doc'.")
                 Exit
 
         decoded_backup_file = decoder.decrypt(backup_file[magic_offset:])
