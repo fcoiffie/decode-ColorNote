@@ -79,16 +79,16 @@ Public Sub ColorNoteRows()
 
     color_index_table_column = 2 ' MAKE SURE THIS IS CORRECT
 
-	sheet = ThisComponent.CurrentController.ActiveSheet
+    sheet = ThisComponent.CurrentController.ActiveSheet
 
-	cursor = sheet.createCursor()
-	cursor.gotoStartOfUsedArea(False)   ' move to cell at start of used area
-	cursor.gotoEndOfUsedArea(True)      ' expand to end of used area
+    cursor = sheet.createCursor()
+    cursor.gotoStartOfUsedArea(False)   ' move to cell at start of used area
+    cursor.gotoEndOfUsedArea(True)      ' expand to end of used area
     used_range = cursor.RangeAddress    ' cursor.RangeAddress is the used range
     first_row = used_range.StartRow
     first_column = used_range.StartColumn
     last_row = used_range.EndRow
-	last_column = used_range.EndColumn
+    last_column = used_range.EndColumn
 
     color_index_column = first_column + color_index_table_column - 1
 
