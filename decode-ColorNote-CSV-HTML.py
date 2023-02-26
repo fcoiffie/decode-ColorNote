@@ -187,6 +187,8 @@ def main():
     out_extn_html = ".html"
     out_sep_html = "_"
     # 'json_keys_select' must include key: "color_index" - for html output
+    # define 'json_keys_select' as empty list to use all available keys
+    json_keys_select = [] # empty list
     json_keys_select = ["_id", "color_index",
                         "created_date", "minor_modified_date", "modified_date",
                         "note", "revision", "title"]
@@ -344,7 +346,7 @@ def main():
         else:
             for n in notes.get():
                 njson = json.loads(str(n))
-                json_keys = njson.keys()
+                json_keys = list(njson.keys())
                 break
         csvwriter.writerow(json_keys)
 
