@@ -186,8 +186,10 @@ def main():
     out_name_html = "ColorNote_backup"
     out_extn_html = ".html"
     out_sep_html = "_"
+
+    # define 'json_keys_select'
+    # define as empty list to use all available keys
     # 'json_keys_select' must include key: "color_index" - for html output
-    # define 'json_keys_select' as empty list to use all available keys
     json_keys_select = [] # empty list
     json_keys_select = ["_id", "color_index",
                         "created_date", "minor_modified_date", "modified_date",
@@ -261,9 +263,11 @@ def main():
 
         backup_file = open(bakfile, "rb").read()
 
-        # handle file types
-        match os.path.splitext(bakfile)[1].lower():
-            case ".backup": 
+        bakfile_type = os.path.splitext(bakfile)[1].lower()
+
+        # handle file types - assign 'magic_offset'
+        match bakfile_type:
+            case ".backup":
                 magic_offset = 28 # 12 also appears to work
             case ".dat":
                 magic_offset = 0
@@ -291,7 +295,17 @@ def main():
         offset = decoded_backup_file.find(substring)
         extract = decoded_backup_file[offset:offset+len(substring)].decode("utf-8")
         logging.debug(f"{offset: <10}: {extract}")
-        idx = offset - 4
+
+        # handle file types - assign 'idx'
+        match bakfile_type:
+            case ".backup":
+                idx = offset - 4
+            case ".dat":
+                idx = 0x10
+            case ".doc":
+                idx = offset - 4
+            case _:
+                idx = offset - 4
 
         #idx = 0x10 # ORIGINAL
         while idx + 4 < len(decoded_backup_file):
@@ -318,6 +332,7 @@ def main():
     #        print(n.get_note())
 
     # -----------------------------------------------------------------------NEW
+    # define date time strings
     dt = datetime.now()
     dtiso = dt.isoformat()
     dtymdhms = dt.strftime("%Y%m%d_%H%M%S")
