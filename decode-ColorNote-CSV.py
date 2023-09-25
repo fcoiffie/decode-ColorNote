@@ -10,6 +10,22 @@ import glob
 from datetime import datetime
 from optparse import OptionParser
 from os.path import abspath, dirname
+# ---------------------------------------------------------------------------NEW
+import csv
+import traceback
+from datetime import timezone
+# ------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------NEW
+def get_excel_date(dt):
+    # Microsoft Excel date is number of days since 1899-12-30
+    # Microsoft Excel date = 1 = 1900-01-01
+    # seconds per day = 60*60*24 = 86400
+    UTC = timezone.utc
+    dt_python = dt.replace(tzinfo=UTC)
+    dt_excel_zero = datetime(1899, 12, 30, tzinfo=UTC)
+    return (dt_python - dt_excel_zero).total_seconds() / 86400
+# ------------------------------------------------------------------------------
 
 class PBEWITHMD5AND128BITAES_CBC_OPENSSL:
     def __init__(self, password, salt, iterations):
@@ -94,6 +110,23 @@ class NotesSet:
 ##
 # MAIN
 def main():
+    # -----------------------------------------------------------------------NEW
+    out_name = "ColorNote_backup"
+    out_extn = ".csv"
+    out_sep = "_"
+    json_keys = ["_id", "account_id", "active_state", "color_index",
+                 "created_date", "dirty", "encrypted", "folder_id",
+                 "importance", "latitude", "longitude", "minor_modified_date",
+                 "modified_date", "note", "note_ext", "note_type",
+                 "reminder_base", "reminder_date", "reminder_duration",
+                 "reminder_last", "reminder_option", "reminder_repeat",
+                 "reminder_repeat_ends", "reminder_type", "revision", "space",
+                 "staged", "status", "tags", "title", "type", "uuid"]
+    json_keys_select = ["_id", "color_index", "created_date",
+                        "minor_modified_date", "modified_date", "note",
+                        "revision", "title"]
+    # --------------------------------------------------------------------------
+
     _salt = b'ColorNote Fixed Salt'
     _iterations = 20 # In fact, not required for derivation
 
@@ -162,13 +195,64 @@ def main():
             notes.update_if_newer(Note(json_chunk))
             idx += chunk_length + 4
 
-    for n in notes.get():
-        if not n.is_archived():
-            print('--------')
-            logging.debug(n)
-            print(n.get_title())
-            print("Created at {}\t Modified at {}".format(n.get_created_date(), n.get_modified_date()))
-            print(n.get_note())
+    #for n in notes.get():
+    #    if not n.is_archived():
+    #        print('--------')
+    #        logging.debug(n)
+    #        print(n.get_title())
+    #        print("Created at {}\t Modified at {}".format(n.get_created_date(), n.get_modified_date()))
+    #        print(n.get_note())
+
+    # -----------------------------------------------------------------------NEW
+    dtn = datetime.now()
+    dtymdhms = dtn.strftime("%Y%m%d_%H%M%S")
+    dtymd = dtn.strftime("%Y%m%d")
+    file_path = out_name + out_sep + dtymdhms + out_extn
+    #with open(file_path, 'a', newline='', encoding='iso-8859-1') as out_file:
+    with open(file_path, 'a', newline='', encoding='utf-8') as out_file:
+        csvwriter = csv.writer(out_file, delimiter=',')
+
+        # write headers
+        #for n in notes.get():
+        #    njson = json.loads(str(n))
+        #    break
+        #csvwriter.writerow(njson.keys())
+        #csvwriter.writerow(json_keys)
+        csvwriter.writerow(json_keys_select)
+
+        for n in notes.get():
+            if not n.is_archived():
+                print("-"*50)
+                logging.debug(n)
+                print(n.get_title())
+                print("Created at {}\t Modified at {}".format(n.get_created_date(), n.get_modified_date()))
+                print(n.get_note())
+                njson = json.loads(str(n))
+                row = []
+                for key in json_keys_select:
+                    match key:
+                        case "created_date":
+                            #value = n.get_created_date().isoformat()
+                            #value = n.get_created_date().strftime("%Y-%m-%d %H:%M:%S.%f")
+                            value = get_excel_date(n.get_created_date())
+                        case "minor_modified_date":
+                            #value = n.get_minor_modified_date().isoformat()
+                            #value = n.get_minor_modified_date().strftime("%Y-%m-%d %H:%M:%S.%f")
+                            value = get_excel_date(n.get_minor_modified_date())
+                        case "modified_date":
+                            #value = n.get_modified_date().isoformat()
+                            #value = n.get_modified_date().strftime("%Y-%m-%d %H:%M:%S.%f")
+                            value = get_excel_date(n.get_modified_date())
+                        case _:
+                            value = njson[key]
+                    row.append(value)
+                csvwriter.writerow(row)
+                #csvwriter.writerow(njson.values())
+                logging.debug(njson)
+                logging.debug(njson.keys())
+                logging.debug(njson.values())
+                logging.debug(njson["note"])
+    # --------------------------------------------------------------------------
 
 if __name__ == "__main__":
     main()
